@@ -26,10 +26,14 @@ struct ContentView: View {
                         .fill(Color(red: 26/255, green: 27/255, blue: 38/255))                    
 
                     VStack(alignment: .leading, spacing: 2) {
-                        // Adds the dynamic play/pause symbol prefix
-                        Text("\(bridge.isPlaying ? "▶" : "⏸") \(bridge.trackTitle)")
+                        // Stripped the emojis, added dynamic color for the title
+                        Text(bridge.trackTitle)
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.primary)
+                            .foregroundColor(
+                                bridge.isPlaying 
+                                ? Color(red: 187/255, green: 154/255, blue: 247/255) 
+                                : .primary
+                            )
                             .lineLimit(1)
                         
                         Text(bridge.artistName)

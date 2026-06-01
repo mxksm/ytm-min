@@ -1,6 +1,6 @@
 # Mini Player for Youtube Music
 
-A vibe coded, minimalistic, Youtube Music mini player for Mac, inspired by Mixlet.
+A vibe coded, minimalistic Youtube Music mini player for Mac, inspired by Mixlet.
 
 ### Usage
 - `cmd + 1`: Switch to the mini text-only widget.

@@ -33,20 +33,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return event }
+            
+            // Global Resizing & Positioning Binds
             if event.modifierFlags.contains(.command) {
                 if event.characters == "1" { self.resizePlayer(expand: false); return nil }
                 if event.characters == "2" { self.resizePlayer(expand: true); return nil }
-                if event.characters == "3" { self.snapToCorner(); return nil } // Snap to corner
+                if event.characters == "3" { self.snapToCorner(); return nil }
             }
+            
+            // Widget-Local Vim Binds
             if !self.isExpanded {
-                if event.keyCode == 36 { self.bridge.togglePlayPause(); return nil }
-                if event.keyCode == 124 { self.bridge.nextTrack(); return nil }
-                if event.keyCode == 123 { self.bridge.previousTrack(); return nil }
+                if event.keyCode == 36 { self.bridge.togglePlayPause(); return nil } // Enter
+                if event.keyCode == 124 { self.bridge.nextTrack(); return nil }      // Right Arrow
+                if event.keyCode == 123 { self.bridge.previousTrack(); return nil }  // Left Arrow
+                
                 if let char = event.charactersIgnoringModifiers {
                     switch char {
                     case "p": self.bridge.togglePlayPause(); return nil
                     case "l": self.bridge.nextTrack(); return nil
                     case "h": self.bridge.previousTrack(); return nil
+                    case "k": self.bridge.increaseVolume(); return nil // Volume Up
+                    case "j": self.bridge.decreaseVolume(); return nil // Volume Down
                     default: break
                     }
                 }

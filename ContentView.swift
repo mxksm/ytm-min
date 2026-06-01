@@ -17,7 +17,7 @@ struct ContentView: View {
             if isExpanded {
                 WebViewWrapper(webView: bridge.webView)
             } else {
-                ZStack {
+                ZStack(alignment: .bottomLeading) {
                     Rectangle().fill(Color(red: 26/255, green: 27/255, blue: 38/255))
                     
                     VStack(alignment: .leading, spacing: 2) {
@@ -32,7 +32,13 @@ struct ContentView: View {
                             .lineLimit(1)
                     }
                     .padding(.horizontal, 10)
-                    .frame(width: smallWidth, height: 44, alignment: .leading)
+                    .padding(.bottom, 6)
+                    .frame(width: smallWidth, height: 44, alignment: .bottomLeading)
+                    
+                    // The Volume Bar
+                    Rectangle()
+                        .fill(Color(red: 187/255, green: 154/255, blue: 247/255))
+                        .frame(width: smallWidth * bridge.volume, height: 3)
                 }
             }
         }

@@ -5,6 +5,7 @@ class YTMusicBridge: NSObject, ObservableObject, WKScriptMessageHandler {
     @Published var trackTitle: String = "Not Playing"
     @Published var artistName: String = "Unknown Artist"
     @Published var isPlaying: Bool = false
+    @Published var volume: Double = 1.0
     
     var webView: WKWebView!
     
@@ -27,7 +28,8 @@ class YTMusicBridge: NSObject, ObservableObject, WKScriptMessageHandler {
                 window.webkit.messageHandlers.trackChanged.postMessage({
                     title: titleEl.innerText,
                     artist: artistEl.innerText,
-                    isPlaying: !video.paused
+                    isPlaying: !video.paused,
+                    volume: video.volume
                 });
             }
         };
@@ -36,6 +38,7 @@ class YTMusicBridge: NSObject, ObservableObject, WKScriptMessageHandler {
         observer.observe(document.body, { childList: true, subtree: true, attributes: true });
         document.addEventListener('play', updateState, true);
         document.addEventListener('pause', updateState, true);
+        document.addEventListener('volumechange', updateState, true);
         """
         
         let userScript = WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
@@ -53,10 +56,23 @@ class YTMusicBridge: NSObject, ObservableObject, WKScriptMessageHandler {
             self.trackTitle = dict["title"] as? String ?? "Unknown"
             self.artistName = dict["artist"] as? String ?? "Unknown"
             self.isPlaying = (dict["isPlaying"] as? Bool ?? false)
+            self.volume = dict["volume"] as? Double ?? 1.0
         }
     }
     
     func togglePlayPause() { webView.evaluateJavaScript("document.querySelector('#play-pause-button')?.click()") }
     func nextTrack() { webView.evaluateJavaScript("document.querySelector('.next-button')?.click()") }
     func previousTrack() { webView.evaluateJavaScript("document.querySelector('.previous-button')?.click()") }
+    
+    // Dispatches a native YouTube Music hotkey event (Equal = Volume Up)
+    func increaseVolume() {
+        let js = "document.dispatchEvent(new KeyboardEvent('keydown', { key: '=', code: 'Equal', keyCode: 187, bubbles: true }));"
+        webView.evaluateJavaScript(js)
+    }
+    
+    // Dispatches a native YouTube Music hotkey event (Minus = Volume Down)
+    func decreaseVolume() {
+        let js = "document.dispatchEvent(new KeyboardEvent('keydown', { key: '-', code: 'Minus', keyCode: 189, bubbles: true }));"
+        webView.evaluateJavaScript(js)
+    }
 }

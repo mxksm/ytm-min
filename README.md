@@ -9,6 +9,8 @@ A vibe coded, minimalistic, Youtube Music mini player for Mac, inspired by Mixle
 - `p`: Pause/Play current track.
 - `h`: Play previous track.
 - `l`: Play next track.
+- `j`: Decrease volume.
+- `k`: Increase volume.
 
 ### Build
 ```bash

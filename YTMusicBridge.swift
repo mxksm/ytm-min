@@ -62,4 +62,17 @@ class YTMusicBridge: NSObject, ObservableObject, WKScriptMessageHandler {
             self.isPlaying = (dict["isPlaying"] == "true")
         }
     }
+
+    func togglePlayPause() {
+        webView.evaluateJavaScript("document.querySelector('#play-pause-button')?.click()")
+    }
+    
+    func nextTrack() {
+        webView.evaluateJavaScript("document.querySelector('.next-button')?.click()")
+    }
+    
+    func previousTrack() {
+        webView.evaluateJavaScript("document.querySelector('.previous-button')?.click()")
+    }
 }
+

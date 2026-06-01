@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import MediaPlayer
 
 @main
 struct CustomMiniPlayerApp: App {
@@ -11,7 +12,6 @@ struct CustomMiniPlayerApp: App {
     }
 }
 
-// Custom window class to force borderless windows to accept keyboard shortcuts
 class CustomWindow: NSWindow {
     override var canBecomeKey: Bool { return true }
     override var canBecomeMain: Bool { return true }
@@ -49,8 +49,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         snapToCorner()
         window.makeKeyAndOrderFront(nil)
         
+        // Hooks up the F7/F8/F9 physical media keys
+        setupMediaKeys()
+        
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return event }
+            
+            // Intercept Spacebar (keycode 49) ONLY when in the mini widget mode
+            if event.keyCode == 49 && !self.isExpanded {
+                self.bridge.togglePlayPause()
+                return nil // Consumes the input so macOS doesn't play an error "beep"
+            }
+            
             if event.modifierFlags.contains(.command) {
                 if event.characters == "1" {
                     self.resizePlayer(expand: false)
@@ -61,6 +71,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             return event
+        }
+    }
+    
+    // Explicitly registers the app with macOS's media control center
+    private func setupMediaKeys() {
+        let commandCenter = MPRemoteCommandCenter.shared()
+        
+        commandCenter.playCommand.addTarget { [weak self] _ in
+            self?.bridge.togglePlayPause()
+            return .success
+        }
+        commandCenter.pauseCommand.addTarget { [weak self] _ in
+            self?.bridge.togglePlayPause()
+            return .success
+        }
+        commandCenter.togglePlayPauseCommand.addTarget { [weak self] _ in
+            self?.bridge.togglePlayPause()
+            return .success
+        }
+        commandCenter.nextTrackCommand.addTarget { [weak self] _ in
+            self?.bridge.nextTrack()
+            return .success
+        }
+        commandCenter.previousTrackCommand.addTarget { [weak self] _ in
+            self?.bridge.previousTrack()
+            return .success
         }
     }
     
@@ -83,14 +119,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let targetWidth = isExpanded ? largeWidth : smallWidth
         let targetHeight = isExpanded ? largeHeight : smallHeight
         
-        // This math ensures the bottom right corner of the app always stays pinned 
-        // to the bottom right corner of your screen, even when it grows to 800x600
         let newX = screenFrame.maxX - targetWidth - screenPadding
         let newY = screenFrame.minY + screenPadding
         
         let newFrame = NSRect(x: newX, y: newY, width: targetWidth, height: targetHeight)
         
-        // Changing animate to true gives it a smooth expanding effect
         window.setFrame(newFrame, display: true, animate: true)
     }
 }

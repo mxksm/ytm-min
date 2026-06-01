@@ -1,6 +1,6 @@
 #!/bin/bash
 
-APP_NAME="MixletClone"
+APP_NAME="ytm-min"
 APP_DIR="$APP_NAME.app"
 BIN_DIR="$APP_DIR/Contents/MacOS"
 

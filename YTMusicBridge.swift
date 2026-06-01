@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import MediaPlayer // Needed to publish metadata to macOS
 
 class YTMusicBridge: NSObject, ObservableObject, WKScriptMessageHandler {
     @Published var trackTitle: String = "Not Playing"
@@ -17,7 +18,6 @@ class YTMusicBridge: NSObject, ObservableObject, WKScriptMessageHandler {
         let configuration = WKWebViewConfiguration()
         configuration.mediaTypesRequiringUserActionForPlayback = []
         
-        // Updated JS to capture the video element's pause state and listen for media events
         let source = """
         const updateState = () => {
             const titleEl = document.querySelector('.title.ytmusic-player-bar');
@@ -37,7 +37,6 @@ class YTMusicBridge: NSObject, ObservableObject, WKScriptMessageHandler {
         const observer = new MutationObserver(updateState);
         observer.observe(document.body, { childList: true, subtree: true, attributes: true });
         
-        // Explicitly listen to the native video events
         document.addEventListener('play', updateState, true);
         document.addEventListener('pause', updateState, true);
         """
@@ -60,10 +59,34 @@ class YTMusicBridge: NSObject, ObservableObject, WKScriptMessageHandler {
             self.trackTitle = dict["title"] ?? "Unknown"
             self.artistName = dict["artist"] ?? "Unknown"
             self.isPlaying = (dict["isPlaying"] == "true")
+            
+            // Push the current state to the macOS Control Center
+            self.updateNowPlayingCenter()
         }
     }
-
+    
+    // Explicitly tells macOS that this app is playing media
+    func updateNowPlayingCenter() {
+        var nowPlayingInfo = [String: Any]()
+        nowPlayingInfo[MPMediaItemPropertyTitle] = self.trackTitle
+        nowPlayingInfo[MPMediaItemPropertyArtist] = self.artistName
+        
+        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = self.isPlaying ? 1.0 : 0.0
+        
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
+        MPNowPlayingInfoCenter.default().playbackState = self.isPlaying ? .playing : .paused
+    }
+    
+    private var lastToggleTime = Date.distantPast
+    
     func togglePlayPause() {
+        let now = Date()
+        
+        if now.timeIntervalSince(lastToggleTime) < 0.3 { 
+            return 
+        }
+        
+        lastToggleTime = now
         webView.evaluateJavaScript("document.querySelector('#play-pause-button')?.click()")
     }
     
@@ -75,4 +98,3 @@ class YTMusicBridge: NSObject, ObservableObject, WKScriptMessageHandler {
         webView.evaluateJavaScript("document.querySelector('.previous-button')?.click()")
     }
 }
-

@@ -72,6 +72,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return event
         }
+
+        NSEvent.addLocalMonitorForEvents(matching: .systemDefined) { [weak self] event in
+            guard let self = self else { return event }
+            
+            // Subtype 8 is the macOS hardware identifier for media keys
+            if event.subtype.rawValue == 8 {
+                let keyCode = (event.data1 & 0xFFFF0000) >> 16
+                let keyFlags = (event.data1 & 0x0000FFFF)
+                
+                // 0xA signifies the key is being pressed down (not released)
+                let isKeyDown = (((keyFlags & 0xFF00) >> 8)) == 0xA
+                
+                if isKeyDown {
+                    switch keyCode {
+                    case 16: // Play/Pause physical button (F8)
+                        self.bridge.togglePlayPause()
+                        return nil // Consumes the input, blocking Firefox from seeing it
+                    case 17: // Next Track physical button (F9)
+                        self.bridge.nextTrack()
+                        return nil
+                    case 18: // Previous Track physical button (F7)
+                        self.bridge.previousTrack()
+                        return nil
+                    default:
+                        break
+                    }
+                }
+            }
+            return event
+        }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // Forcefully re-assert Now Playing state to steal media keys back from Firefox
+        bridge.updateNowPlayingCenter()
     }
     
     // Explicitly registers the app with macOS's media control center

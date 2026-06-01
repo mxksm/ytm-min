@@ -24,12 +24,24 @@ class YTMusicBridge: NSObject, ObservableObject, WKScriptMessageHandler {
             const titleEl = document.querySelector('.title.ytmusic-player-bar');
             const artistEl = document.querySelector('.byline.ytmusic-player-bar a');
             
+            let linearVolume = 1.0;
+            if (video) {
+                // Read YouTube's actual UI slider value (0-100) instead of the exponential audio gain
+                const slider = document.querySelector('#volume-slider');
+                if (slider && slider.value !== undefined) {
+                    linearVolume = Number(slider.value) / 100.0;
+                } else {
+                    // Fallback: Reverse the exponential curve if the DOM changes
+                    linearVolume = Math.sqrt(video.volume);
+                }
+            }
+            
             if (video && titleEl && artistEl) {
                 window.webkit.messageHandlers.trackChanged.postMessage({
                     title: titleEl.innerText,
                     artist: artistEl.innerText,
                     isPlaying: !video.paused,
-                    volume: video.volume
+                    volume: linearVolume
                 });
             }
         };
@@ -64,13 +76,11 @@ class YTMusicBridge: NSObject, ObservableObject, WKScriptMessageHandler {
     func nextTrack() { webView.evaluateJavaScript("document.querySelector('.next-button')?.click()") }
     func previousTrack() { webView.evaluateJavaScript("document.querySelector('.previous-button')?.click()") }
     
-    // Dispatches a native YouTube Music hotkey event (Equal = Volume Up)
     func increaseVolume() {
         let js = "document.dispatchEvent(new KeyboardEvent('keydown', { key: '=', code: 'Equal', keyCode: 187, bubbles: true }));"
         webView.evaluateJavaScript(js)
     }
     
-    // Dispatches a native YouTube Music hotkey event (Minus = Volume Down)
     func decreaseVolume() {
         let js = "document.dispatchEvent(new KeyboardEvent('keydown', { key: '-', code: 'Minus', keyCode: 189, bubbles: true }));"
         webView.evaluateJavaScript(js)

@@ -36,6 +36,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if event.modifierFlags.contains(.command) {
                 if event.characters == "1" { self.resizePlayer(expand: false); return nil }
                 if event.characters == "2" { self.resizePlayer(expand: true); return nil }
+                if event.characters == "3" { self.snapToCorner(); return nil } // Snap to corner
             }
             if !self.isExpanded {
                 if event.keyCode == 36 { self.bridge.togglePlayPause(); return nil }

@@ -10,6 +10,7 @@ struct WebViewWrapper: NSViewRepresentable {
 struct ContentView: View {
     @ObservedObject var bridge: YTMusicBridge
     var isExpanded: Bool
+    var isTransparent: Bool
     var smallWidth: CGFloat
     
     var body: some View {
@@ -18,7 +19,9 @@ struct ContentView: View {
                 WebViewWrapper(webView: bridge.webView)
             } else {
                 ZStack(alignment: .bottomLeading) {
-                    Rectangle().fill(Color(red: 26/255, green: 27/255, blue: 38/255))
+                    // Toggles between completely invisible and solid Tokyo Night
+                    Rectangle()
+                        .fill(Color(red: 26/255, green: 27/255, blue: 38/255).opacity(isTransparent ? 0.0 : 1.0))
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text(bridge.trackTitle)

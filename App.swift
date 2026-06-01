@@ -21,7 +21,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let largeWidth: CGFloat = 800
     let largeHeight: CGFloat = 600
     let screenPadding: CGFloat = 10
+    
     var isExpanded = false
+    var isTransparent = false 
+    
+    private var lastSmallPlayerPosition: NSRect?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         window = CustomWindow(contentRect: NSRect(x: 0, y: 0, width: smallWidth, height: smallHeight),
@@ -34,26 +38,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return event }
             
-            // Global Resizing & Positioning Binds
-            if event.modifierFlags.contains(.command) {
-                if event.characters == "1" { self.resizePlayer(expand: false); return nil }
-                if event.characters == "2" { self.resizePlayer(expand: true); return nil }
-                if event.characters == "3" { self.snapToCorner(); return nil }
-            }
-            
-            // Widget-Local Vim Binds
-            if !self.isExpanded {
-                if event.keyCode == 36 { self.bridge.togglePlayPause(); return nil } // Enter
-                if event.keyCode == 124 { self.bridge.nextTrack(); return nil }      // Right Arrow
-                if event.keyCode == 123 { self.bridge.previousTrack(); return nil }  // Left Arrow
+            if let char = event.charactersIgnoringModifiers?.lowercased() {
                 
-                if let char = event.charactersIgnoringModifiers {
+                // Global Binds (Active whether expanded or small)
+                if char == "e" { self.togglePlayerSize(); return nil }
+                if char == "s" { self.snapToCorner(); return nil }
+                if char == "t" { self.toggleTransparency(); return nil }
+                
+                // Widget-Local Vim Binds (Active only when small)
+                if !self.isExpanded {
+                    if event.keyCode == 36 { self.bridge.togglePlayPause(); return nil } // Enter
+                    if event.keyCode == 124 { self.bridge.nextTrack(); return nil }      // Right Arrow
+                    if event.keyCode == 123 { self.bridge.previousTrack(); return nil }  // Left Arrow
+                    
                     switch char {
                     case "p": self.bridge.togglePlayPause(); return nil
                     case "l": self.bridge.nextTrack(); return nil
                     case "h": self.bridge.previousTrack(); return nil
-                    case "k": self.bridge.increaseVolume(); return nil // Volume Up
-                    case "j": self.bridge.decreaseVolume(); return nil // Volume Down
+                    case "k", "=": self.bridge.increaseVolume(); return nil
+                    case "j", "-": self.bridge.decreaseVolume(); return nil
                     default: break
                     }
                 }
@@ -62,8 +65,64 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    private func updateView() { window.contentView = NSHostingView(rootView: ContentView(bridge: bridge, isExpanded: isExpanded, smallWidth: smallWidth)) }
-    private func resizePlayer(expand: Bool) { guard isExpanded != expand else { return }; isExpanded = expand; updateView(); snapToCorner() }
+    private func updateView() { 
+        window.contentView = NSHostingView(rootView: ContentView(bridge: bridge, isExpanded: isExpanded, isTransparent: isTransparent, smallWidth: smallWidth)) 
+    }
+    
+    private func togglePlayerSize() {
+        if !isExpanded {
+            // About to expand: remember the current small position
+            lastSmallPlayerPosition = window.frame
+        }
+        
+        isExpanded.toggle()
+        updateView()
+        
+        if isExpanded {
+            // Dynamic expansion based on screen space
+            resizeInPlace()
+        } else if let lastPos = lastSmallPlayerPosition {
+            // Restore the exact last small position when collapsing
+            window.setFrame(lastPos, display: true, animate: true)
+            lastSmallPlayerPosition = nil // Clear after restoring
+        }
+    }
+    
+    private func toggleTransparency() {
+        isTransparent.toggle()
+        updateView()
+    }
+    
+    // Calculates which quadrant the window is in, and expands away from the nearest edges
+    private func resizeInPlace() {
+        guard let screen = window.screen ?? NSScreen.main else { return }
+        let screenFrame = screen.visibleFrame
+        let currentFrame = window.frame
+        
+        let targetWidth = isExpanded ? largeWidth : smallWidth
+        let targetHeight = isExpanded ? largeHeight : smallHeight
+        
+        var newX = currentFrame.origin.x
+        var newY = currentFrame.origin.y
+        
+        if currentFrame.midX > screenFrame.midX {
+            newX = currentFrame.maxX - targetWidth
+        } else {
+            newX = currentFrame.minX
+        }
+        
+        if currentFrame.midY > screenFrame.midY {
+            newY = currentFrame.maxY - targetHeight
+        } else {
+            newY = currentFrame.minY
+        }
+        
+        newX = max(screenFrame.minX + screenPadding, min(newX, screenFrame.maxX - targetWidth - screenPadding))
+        newY = max(screenFrame.minY + screenPadding, min(newY, screenFrame.maxY - targetHeight - screenPadding))
+        
+        window.setFrame(NSRect(x: newX, y: newY, width: targetWidth, height: targetHeight), display: true, animate: true)
+    }
+    
     private func snapToCorner() {
         guard let screen = NSScreen.main else { return }
         let screenFrame = screen.visibleFrame

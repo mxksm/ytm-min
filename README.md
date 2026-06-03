@@ -3,7 +3,11 @@
 A vibe coded, minimalistic Youtube Music mini player for Mac, inspired by Mixlet.
 
 ### Usage
-- `e`: Toggle mini text-only widget and expanded window.
+#### Key binds active everywhere beside when searching
+- `q`: Quit.
+- `e`: Toggle widget size.
+
+#### Mini widget only key binds
 - `t`: Toggle transparent background.
 - `s`: Snap the window to default position.
 - `p`: Pause/Play current track.

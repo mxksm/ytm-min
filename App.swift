@@ -37,21 +37,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return event }
+            let isCmd = event.modifierFlags.contains(.command)
+            let char = event.charactersIgnoringModifiers?.lowercased()
             
-            if let char = event.charactersIgnoringModifiers?.lowercased() {
-                
-                // Global Binds (Active whether expanded or small)
+            // 1. ESCAPE KEY: Blurs input and shrinks player instantly
+            if event.keyCode == 53 && self.isExpanded {
+                self.bridge.webView.evaluateJavaScript("if(document.activeElement){ document.activeElement.blur(); }")
+                self.togglePlayerSize()
+                return nil
+            }
+            
+            // 2. CMD-MODIFIED BINDS (Always active as fail-safes)
+            if isCmd {
                 if char == "e" { self.togglePlayerSize(); return nil }
                 if char == "s" { self.snapToCorner(); return nil }
                 if char == "t" { self.toggleTransparency(); return nil }
+                if char == "q" { NSApplication.shared.terminate(nil); return nil }
+            }
+            
+            // 3. SINGLE-LETTER
+            if let key = char {
                 
-                // Widget-Local Vim Binds (Active only when small)
+                // If expanded AND typing in a search box, pass key to browser
+                if self.isExpanded && self.bridge.isInputFocused {
+                    return event
+                }
+                
+                // 'e' toggles size and 'q' quits from anywhere (as long as you aren't typing)
+                if key == "e" { self.togglePlayerSize(); return nil }
+                if key == "q" { NSApplication.shared.terminate(nil); return nil }
+                
+                // The rest only work in small mode
                 if !self.isExpanded {
                     if event.keyCode == 36 { self.bridge.togglePlayPause(); return nil } // Enter
                     if event.keyCode == 124 { self.bridge.nextTrack(); return nil }      // Right Arrow
                     if event.keyCode == 123 { self.bridge.previousTrack(); return nil }  // Left Arrow
                     
-                    switch char {
+                    switch key {
+                    case "s": self.snapToCorner(); return nil
+                    case "t": self.toggleTransparency(); return nil
                     case "p": self.bridge.togglePlayPause(); return nil
                     case "l": self.bridge.nextTrack(); return nil
                     case "h": self.bridge.previousTrack(); return nil
@@ -62,10 +86,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             
-            // This prevents the macOS error beep for unmapped keys.
-            if !self.isExpanded {
-                return nil
-            }
+            // Swallow remaining keystrokes in small mode to prevent macOS error beep
+            if !self.isExpanded { return nil }
             
             return event
         }
@@ -76,10 +98,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func togglePlayerSize() {
-        if !isExpanded {
-            lastSmallPlayerPosition = window.frame
-        }
-        
+        if !isExpanded { lastSmallPlayerPosition = window.frame }
         isExpanded.toggle()
         updateView()
         
@@ -107,17 +126,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         var newX = currentFrame.origin.x
         var newY = currentFrame.origin.y
         
-        if currentFrame.midX > screenFrame.midX {
-            newX = currentFrame.maxX - targetWidth
-        } else {
-            newX = currentFrame.minX
-        }
-        
-        if currentFrame.midY > screenFrame.midY {
-            newY = currentFrame.maxY - targetHeight
-        } else {
-            newY = currentFrame.minY
-        }
+        if currentFrame.midX > screenFrame.midX { newX = currentFrame.maxX - targetWidth } else { newX = currentFrame.minX }
+        if currentFrame.midY > screenFrame.midY { newY = currentFrame.maxY - targetHeight } else { newY = currentFrame.minY }
         
         newX = max(screenFrame.minX + screenPadding, min(newX, screenFrame.maxX - targetWidth - screenPadding))
         newY = max(screenFrame.minY + screenPadding, min(newY, screenFrame.maxY - targetHeight - screenPadding))

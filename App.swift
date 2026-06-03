@@ -61,6 +61,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
             }
+            
+            // This prevents the macOS error beep for unmapped keys.
+            if !self.isExpanded {
+                return nil
+            }
+            
             return event
         }
     }
@@ -71,7 +77,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func togglePlayerSize() {
         if !isExpanded {
-            // About to expand: remember the current small position
             lastSmallPlayerPosition = window.frame
         }
         
@@ -79,12 +84,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateView()
         
         if isExpanded {
-            // Dynamic expansion based on screen space
             resizeInPlace()
         } else if let lastPos = lastSmallPlayerPosition {
-            // Restore the exact last small position when collapsing
             window.setFrame(lastPos, display: true, animate: true)
-            lastSmallPlayerPosition = nil // Clear after restoring
+            lastSmallPlayerPosition = nil
         }
     }
     
@@ -93,7 +96,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateView()
     }
     
-    // Calculates which quadrant the window is in, and expands away from the nearest edges
     private func resizeInPlace() {
         guard let screen = window.screen ?? NSScreen.main else { return }
         let screenFrame = screen.visibleFrame

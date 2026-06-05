@@ -24,6 +24,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     var isExpanded = false
     var isTransparent = false 
+    var isAutoHideEnabled = false // Tracks if "Focus-Only" mode is active
     
     private var lastSmallPlayerPosition: NSRect?
     
@@ -55,16 +56,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if char == "q" { NSApplication.shared.terminate(nil); return nil }
             }
             
-            // 3. SINGLE-LETTER
+            // 3. SINGLE-LETTER VIM BINDS
             if let key = char {
                 
-                // If expanded AND typing in a search box, pass key to browser
+                // VIM INSERT MODE: If expanded AND typing in a search box, pass key to browser
                 if self.isExpanded && self.bridge.isInputFocused {
                     return event
                 }
                 
-                // 'e' toggles size and 'q' quits from anywhere (as long as you aren't typing)
+                // VIM NORMAL MODE: Global toggles from anywhere (as long as you aren't typing)
                 if key == "e" { self.togglePlayerSize(); return nil }
+                if key == "h" { self.toggleAutoHide(); return nil } // Auto-Hide toggle
                 if key == "q" { NSApplication.shared.terminate(nil); return nil }
                 
                 // The rest only work in small mode
@@ -78,7 +80,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     case "t": self.toggleTransparency(); return nil
                     case "p": self.bridge.togglePlayPause(); return nil
                     case "l": self.bridge.nextTrack(); return nil
-                    case "h": self.bridge.previousTrack(); return nil
                     case "k", "=": self.bridge.increaseVolume(); return nil
                     case "j", "-": self.bridge.decreaseVolume(); return nil
                     default: break
@@ -91,6 +92,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             return event
         }
+    }
+    
+    // macOS Lifecycle Hooks for Focus Changes
+    func applicationDidBecomeActive(_ notification: Notification) {
+        updateVisibility()
+    }
+    
+    func applicationDidResignActive(_ notification: Notification) {
+        updateVisibility()
+    }
+    
+    private func updateVisibility() {
+        // Hide if Auto-Hide is enabled AND the app just lost focus
+        let shouldHide = isAutoHideEnabled && !NSApplication.shared.isActive
+        
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            window.animator().alphaValue = shouldHide ? 0.0 : 1.0
+        }
+        window.ignoresMouseEvents = shouldHide
+    }
+    
+    private func toggleAutoHide() {
+        isAutoHideEnabled.toggle()
+        updateVisibility()
     }
     
     private func updateView() { 

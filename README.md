@@ -9,6 +9,7 @@ A vibe coded, minimalistic Youtube Music mini player for Mac, inspired by Mixlet
 
 #### Mini widget only key binds
 - `t`: Toggle transparent background.
+- `h`: Toggle hide mode: window appears only when focused on.
 - `s`: Snap the window to default position.
 - `p`: Pause/Play current track.
 - `h`: Play previous track.

@@ -66,7 +66,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 
                 // VIM NORMAL MODE: Global toggles from anywhere (as long as you aren't typing)
                 if key == "e" { self.togglePlayerSize(); return nil }
-                if key == "h" { self.toggleAutoHide(); return nil } // Auto-Hide toggle
+                if key == "f" { self.toggleAutoHide(); return nil } // 'f' mapped to Focus/Fade
                 if key == "q" { NSApplication.shared.terminate(nil); return nil }
                 
                 // The rest only work in small mode
@@ -80,6 +80,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     case "t": self.toggleTransparency(); return nil
                     case "p": self.bridge.togglePlayPause(); return nil
                     case "l": self.bridge.nextTrack(); return nil
+                    case "h": self.bridge.previousTrack(); return nil // Restored to previous track!
                     case "k", "=": self.bridge.increaseVolume(); return nil
                     case "j", "-": self.bridge.decreaseVolume(); return nil
                     default: break

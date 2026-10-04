@@ -12,6 +12,7 @@ struct ContentView: View {
     var isExpanded: Bool
     var isTransparent: Bool
     var smallWidth: CGFloat
+    var smallHeight: CGFloat
     
     // Tracks if the app currently has window focus
     @State private var isAppFocused: Bool = true
@@ -28,19 +29,19 @@ struct ContentView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(bridge.trackTitle)
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(bridge.isPlaying ? Color(red: 187/255, green: 154/255, blue: 247/255) : .primary)
+                            .foregroundColor(.gray)
                             .lineLimit(1)
                         
                         Text(bridge.artistName)
                             .font(.system(size: 10))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.gray)
                             .lineLimit(1)
                     }
                     .padding(.horizontal, 10)
-                    .padding(.bottom, 6)
-                    .frame(width: smallWidth, height: 44, alignment: .bottomLeading)
+                        .padding(.bottom, 4)
+                        .frame(width: smallWidth, height: smallHeight, alignment: .bottomLeading)
                     
-                    // The Volume Bar - now fades out when app loses focus
+                    // The Volume Bar - stays as your accent color
                     Rectangle()
                         .fill(Color(red: 187/255, green: 154/255, blue: 247/255))
                         .frame(width: smallWidth * bridge.volume, height: 3)

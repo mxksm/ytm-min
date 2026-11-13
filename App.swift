@@ -3,7 +3,6 @@ import WebKit
 
 @main
 struct CustomMiniPlayerApp: App {
-    @StateObject private var bridge = YTMusicBridge()
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     var body: some Scene { Settings { EmptyView() } }
 }
@@ -15,6 +14,11 @@ class CustomWindow: NSWindow {
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
         frameRect
     }
+}
+
+final class PlayerWindowState: ObservableObject {
+    @Published var isExpanded = false
+    @Published var isTransparent = true
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -29,12 +33,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let paddingX: CGFloat = 10 + 100
     let paddingY: CGFloat = 10
     
-    var isExpanded = false
-    var isTransparent = true
+    private let viewState = PlayerWindowState()
+    private var isExpanded: Bool { viewState.isExpanded }
     var isAutoHideEnabled = true
     
     private var lastSmallPlayerPosition: NSRect?
     private var screenObserver: NSObjectProtocol?
+    private var keyMonitor: Any?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Removed .fullSizeContentView to strip insets
@@ -45,74 +50,52 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.isOpaque = false; window.backgroundColor = .clear; window.hasShadow = false; window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         
-        updateView(); snapToCorner(); window.makeKeyAndOrderFront(nil)
+        window.contentView = NSHostingView(rootView: ContentView(bridge: bridge, state: viewState, smallWidth: smallWidth, smallHeight: smallHeight))
+        window.isMovableByWindowBackground = true
+        bridge.onShortcut = { [weak self] action in self?.perform(action) }
+        snapToCorner()
+        window.makeKeyAndOrderFront(nil)
 
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            guard let self, !self.isExpanded else { return }
+            guard let self else { return }
+            self.lastSmallPlayerPosition = nil
             self.snapToCorner()
         }
         
-        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self = self else { return event }
-            let isCmd = event.modifierFlags.contains(.command)
-            let char = event.charactersIgnoringModifiers?.lowercased()
-            
-            // 1. ESCAPE KEY
-            if event.keyCode == 53 && self.isExpanded {
-                self.bridge.webView.evaluateJavaScript("if(document.activeElement){ document.activeElement.blur(); }")
-                self.togglePlayerSize()
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, event.window === self.window else { return event }
+            if let action = KeyboardShortcuts.action(keyCode: event.keyCode,
+                                                     characters: event.charactersIgnoringModifiers,
+                                                     modifiers: event.modifierFlags, expanded: self.isExpanded) {
+                if !event.isARepeat || action.allowsRepeat { self.perform(action) }
                 return nil
             }
-            
-            // 2. CMD-MODIFIED BINDS
-            if isCmd {
-                if char == "e" { self.togglePlayerSize(); return nil }
-                if char == "s" { self.snapToCorner(); return nil }
-                if char == "t" { self.toggleTransparency(); return nil }
-                if char == "q" { NSApplication.shared.terminate(nil); return nil }
-            }
-            
-            // 3. SINGLE-LETTER VIM BINDS
-            if let key = char {
-                
-                if self.isExpanded && self.bridge.isInputFocused {
-                    return event
-                }
-                
-                if key == "e" { self.togglePlayerSize(); return nil }
-                if key == "f" { self.toggleAutoHide(); return nil }
-                if key == "q" { NSApplication.shared.terminate(nil); return nil }
-                if key == "p" { self.bridge.togglePlayPause(); return nil }
-                if key == "l" { self.bridge.nextTrack(); return nil }
-                if key == "h" { self.bridge.previousTrack(); return nil }
-                
-            if !self.isExpanded || key == "j" || key == "k" {
-                    if event.keyCode == 36 { self.bridge.togglePlayPause(); return nil } 
-                    if event.keyCode == 124 { self.bridge.nextTrack(); return nil }      
-                    if event.keyCode == 123 { self.bridge.previousTrack(); return nil }  
-                    
-                    switch key {
-                    case "s": self.snapToCorner(); return nil
-                    case "t": self.toggleTransparency(); return nil
-                    case "k", "=": self.bridge.increaseVolume(); return nil
-                    case "j", "-": self.bridge.decreaseVolume(); return nil
-                    default: break
-                    }
-                }
-            }
-            
-            if !self.isExpanded { return nil }
-            
-            return event
+            // Leave standard modified shortcuts (copy/paste, etc.) to the responder.
+            let modified = !event.modifierFlags.intersection([.command, .control, .option]).isEmpty
+            return self.isExpanded || modified ? event : nil
+        }
+    }
+
+    private func perform(_ action: PlayerAction) {
+        switch action {
+        case .toggleSize: togglePlayerSize()
+        case .toggleAutoHide: toggleAutoHide()
+        case .toggleTransparency: viewState.isTransparent.toggle()
+        case .snap: snapToCorner()
+        case .quit: NSApplication.shared.terminate(nil)
+        case .reload: bridge.reload()
+        default: bridge.perform(action)
         }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        bridge.shutdown()
     }
     
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -124,6 +107,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func updateVisibility() {
+        guard let window else { return }
         let shouldHide = isAutoHideEnabled && !NSApplication.shared.isActive
         
         NSAnimationContext.runAnimationGroup { context in
@@ -138,26 +122,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateVisibility()
     }
     
-    private func updateView() { 
-        window.contentView = NSHostingView(rootView: ContentView(bridge: bridge, isExpanded: isExpanded, isTransparent: isTransparent, smallWidth: smallWidth, smallHeight: smallHeight))
-    }
-    
     private func togglePlayerSize() {
         if !isExpanded { lastSmallPlayerPosition = window.frame }
-        isExpanded.toggle()
-        updateView()
+        viewState.isExpanded.toggle()
+        window.isMovableByWindowBackground = !isExpanded
+        window.makeFirstResponder(isExpanded ? bridge.webView : window)
         
         if isExpanded {
             resizeInPlace()
         } else if let lastPos = lastSmallPlayerPosition {
-            window.setFrame(lastPos, display: true, animate: true)
+            window.setFrame(clamped(lastPos), display: true, animate: true)
             lastSmallPlayerPosition = nil
+        } else {
+            // A display change may invalidate the saved compact frame.
+            snapToCorner()
         }
-    }
-    
-    private func toggleTransparency() {
-        isTransparent.toggle()
-        updateView()
     }
     
     private func resizeInPlace() {
@@ -178,15 +157,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         newX = max(screenFrame.minX + paddingX, min(newX, screenFrame.maxX - targetWidth - paddingX))
         newY = max(screenFrame.minY + paddingY, min(newY, screenFrame.maxY - targetHeight - paddingY))
         
-        window.setFrame(NSRect(x: newX, y: newY, width: targetWidth, height: targetHeight), display: true, animate: true)
+        window.setFrame(clamped(NSRect(x: newX, y: newY, width: targetWidth, height: targetHeight)), display: true, animate: true)
     }
     
     private func snapToCorner() {
-        guard let screen = NSScreen.main else { return }
+        guard let screen = window.screen ?? NSScreen.main else { return }
 
         if !isExpanded, let shoulder = screen.auxiliaryTopLeftArea {
             let height = min(smallHeight, shoulder.height)
-            let width = min(smallWidth, shoulder.width)
+            let width = min(smallWidth, max(0, shoulder.width - 12))
             let frame = NSRect(
                 x: shoulder.minX + 6,
                 y: shoulder.maxY - height,
@@ -202,6 +181,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let targetHeight = isExpanded ? largeHeight : smallHeight
         
         // Applied paddingX and paddingY
-        window.setFrame(NSRect(x: screenFrame.maxX - targetWidth - paddingX, y: screenFrame.minY + paddingY, width: targetWidth, height: targetHeight), display: true, animate: true)
+        window.setFrame(clamped(NSRect(x: screenFrame.maxX - targetWidth - paddingX, y: screenFrame.minY + paddingY, width: targetWidth, height: targetHeight)), display: true, animate: true)
     }
+    private func clamped(_ frame: NSRect) -> NSRect {
+        let screen = NSScreen.screens.first { $0.frame.intersects(frame) } ?? window.screen ?? NSScreen.main
+        guard let screen else { return frame }
+        // A saved mini player may live in the menu-bar shoulder beside the notch.
+        let bounds = !isExpanded && frame.maxY > screen.visibleFrame.maxY ? screen.frame : screen.visibleFrame
+        let width = min(frame.width, bounds.width)
+        let height = min(frame.height, bounds.height)
+        return NSRect(x: min(max(frame.minX, bounds.minX), bounds.maxX - width),
+                      y: min(max(frame.minY, bounds.minY), bounds.maxY - height), width: width, height: height)
+    }
+
 }

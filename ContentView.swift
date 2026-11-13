@@ -9,8 +9,7 @@ struct WebViewWrapper: NSViewRepresentable {
 
 struct ContentView: View {
     @ObservedObject var bridge: YTMusicBridge
-    var isExpanded: Bool
-    var isTransparent: Bool
+    @ObservedObject var state: PlayerWindowState
     var smallWidth: CGFloat
     var smallHeight: CGFloat
     
@@ -18,13 +17,16 @@ struct ContentView: View {
     @State private var isAppFocused: Bool = true
     
     var body: some View {
-        Group {
-            if isExpanded {
-                WebViewWrapper(webView: bridge.webView)
-            } else {
+        ZStack {
+            // Keep the same WebKit view mounted across mode changes.
+            WebViewWrapper(webView: bridge.webView)
+                .opacity(state.isExpanded ? 1 : 0)
+                .allowsHitTesting(state.isExpanded)
+                .accessibilityHidden(!state.isExpanded)
+            if !state.isExpanded {
                 ZStack(alignment: .bottomLeading) {
                     Rectangle()
-                        .fill(Color(red: 26/255, green: 27/255, blue: 38/255).opacity(isTransparent ? 0.0 : 1.0))
+                        .fill(Color(red: 26/255, green: 27/255, blue: 38/255).opacity(state.isTransparent ? 0.0 : 1.0))
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text(bridge.trackTitle)
@@ -50,8 +52,15 @@ struct ContentView: View {
                 }
             }
         }
+        .overlay(alignment: .top) {
+            if state.isExpanded, let error = bridge.errorMessage {
+                HStack {
+                    Text(error).font(.caption).lineLimit(3)
+                    Button("Retry") { bridge.reload() }
+                }.padding(8).background(.regularMaterial)
+            }
+        }
         .onAppear { 
-            NSApp.mainWindow?.isMovableByWindowBackground = true
             isAppFocused = NSApplication.shared.isActive
         }
         // Listen for macOS focus events
